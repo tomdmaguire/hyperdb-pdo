@@ -33,7 +33,8 @@ if ( defined('DB_CONFIG_FILE') && file_exists( DB_CONFIG_FILE ) ) {
 }
 
 require_once dirname(__FILE__) . '/PDOEngine.php';
-define('DB_TYPE', 'mysql');
+if(!defined('DB_TYPE'))
+	define('DB_TYPE', 'mysql');
 
 /**
  * Common definitions
