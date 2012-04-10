@@ -550,7 +550,7 @@ class hyperdb extends wpdb {
 					|| true === $tcp = $this->check_tcp_responsiveness($host, $port, $timeout) )
 				{
 					// $this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
-					$this->dbhs[$dbhname] = NEW PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port"));
+					$this->dbhs[$dbhname] = new PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port"));
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
@@ -652,6 +652,11 @@ class hyperdb extends wpdb {
 		}
 
 		return $this->dbhs[$dbhname];
+	}
+
+	function getPdo()
+	{
+		return $this->dbh->getPdo();
 	}
 
 	/**

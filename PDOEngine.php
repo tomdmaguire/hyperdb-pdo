@@ -155,6 +155,10 @@ HTML;
         }
     }
 
+    public function getPdo()
+    {
+        return $this->pdo;
+    }
 
     /**
      *  handles a query request from db.php
