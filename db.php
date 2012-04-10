@@ -32,8 +32,11 @@ if ( defined('DB_CONFIG_FILE') && file_exists( DB_CONFIG_FILE ) ) {
 
 }
 
+require_once dirname(__FILE__) . '/PDOEngine.php';
+define('DB_TYPE', 'mysql');
+
 /**
- * Common definitions 
+ * Common definitions
  */
 define( 'HYPERDB_LAG_OK', 1 );
 define( 'HYPERDB_LAG_BEHIND', 2 );
@@ -229,7 +232,7 @@ class hyperdb extends wpdb {
 
 	/**
 	 * Add a callback to a group of callbacks.
-	 * The default group is 'dataset', used to examine 
+	 * The default group is 'dataset', used to examine
 	 * queries and determine dataset.
 	 */
 	function add_callback( $callback, $group = 'dataset' ) {
@@ -340,7 +343,7 @@ class hyperdb extends wpdb {
 	function &db_connect( $query = '' ) {
 		$connect_function = $this->persistent ? 'mysql_pconnect' : 'mysql_connect';
 		if ( empty( $this->hyper_servers ) ) {
-			if ( is_resource( $this->dbh ) )
+			if ( $this->is_pdo_resource( $this->dbh ) )
 				return $this->dbh;
 			if (
 				!defined('DB_HOST')
@@ -348,16 +351,18 @@ class hyperdb extends wpdb {
 				|| !defined('DB_PASSWORD')
 				|| !defined('DB_NAME') )
 				return $this->bail("We were unable to query because there was no database defined.");
-			$this->dbh = @ $connect_function(DB_HOST, DB_USER, DB_PASSWORD, true);
-			if ( ! is_resource( $this->dbh ) )
+			// $this->dbh = @ $connect_function(DB_HOST, DB_USER, DB_PASSWORD, true);
+
+			$this->dbh = NEW PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
+
+			if ( ! $this->is_pdo_resource( $this->dbh ) )
 				return $this->bail("We were unable to connect to the database. (DB_HOST)");
-			if ( ! mysql_select_db(DB_NAME, $this->dbh) )
-				return $this->bail("We were unable to select the database.");
 			if ( ! empty( $this->charset ) ) {
 				$collation_query = "SET NAMES '$this->charset'";
 				if ( !empty( $this->collate ) )
 					$collation_query .= " COLLATE '$this->collate'";
-				mysql_query($collation_query, $this->dbh);
+				// mysql_query($collation_query, $this->dbh);
+				$this->dbh->query($query);
 			}
 			return $this->dbh;
 		}
@@ -412,7 +417,7 @@ class hyperdb extends wpdb {
 		}
 
 		// Try to reuse an existing connection
-		while ( isset( $this->dbhs[$dbhname] ) && is_resource( $this->dbhs[$dbhname] ) ) {
+		while ( isset( $this->dbhs[$dbhname] ) && $this->is_pdo_resource( $this->dbhs[$dbhname] ) ) {
 			// Find the connection for incrementing counters
 			foreach ( array_keys($this->db_connections) as $i )
 				if ( $this->db_connections[$i]['dbhname'] == $dbhname )
@@ -422,16 +427,6 @@ class hyperdb extends wpdb {
 				$name = $server['name'];
 				// A callback has specified a database name so it's possible the existing connection selected a different one.
 				if ( $name != $this->used_servers[$dbhname]['name'] ) {
-					if ( !mysql_select_db($name, $this->dbhs[$dbhname]) ) {
-						// this can happen when the user varies and lacks permission on the $name database
-						if ( isset( $conn['disconnect (select failed)'] ) )
-							++$conn['disconnect (select failed)'];
-						else
-							$conn['disconnect (select failed)'] = 1;
-
-						$this->disconnect($dbhname);
-						break;
-					}
 					$this->used_servers[$dbhname]['name'] = $name;
 				}
 			} else {
@@ -449,7 +444,8 @@ class hyperdb extends wpdb {
 			$this->last_used_server = $this->used_servers[$dbhname];
 			$this->last_connection = compact('dbhname', 'name');
 
-			if ( !mysql_ping($this->dbhs[$dbhname]) ) {
+			// if ( !mysql_ping($this->dbhs[$dbhname]) ) {
+			if( !$this->ping($this->dbhs[$dbhname])) {
 				if ( isset( $conn['disconnect (ping failed)'] ) )
 					++$conn['disconnect (ping failed)'];
 				else
@@ -459,7 +455,7 @@ class hyperdb extends wpdb {
 				break;
 			}
 
-			if ( isset( $conn['queries'] ) ) 
+			if ( isset( $conn['queries'] ) )
 				++$conn['queries'];
 			else
 				$conn['queries'] = 1;
@@ -483,13 +479,13 @@ class hyperdb extends wpdb {
 			foreach ( $this->hyper_servers[$dataset][$operation] as $group => $items ) {
 				$keys = array_keys($items);
 				shuffle($keys);
-				foreach ( $keys as $key ) 
+				foreach ( $keys as $key )
 					$servers[] = compact('group', 'key');
 			}
 
-			if ( !$tries_remaining = count( $servers ) ) 
+			if ( !$tries_remaining = count( $servers ) )
 				return $this->bail("No database servers were found to match the query. ($this->table, $dataset)");
-			
+
 			if ( !isset( $unique_servers ) )
 				$unique_servers = $tries_remaining;
 
@@ -501,8 +497,8 @@ class hyperdb extends wpdb {
 			$success = false;
 
 			foreach ( $servers as $group_key ) {
-				--$tries_remaining;	
-	
+				--$tries_remaining;
+
 				// If all servers are lagged, we need to start ignoring the lag and retry
 				if ( count( $unique_lagged_slaves ) == $unique_servers )
 					break;
@@ -566,18 +562,20 @@ class hyperdb extends wpdb {
 				if ( $use_master || !$tries_remaining || !$this->check_tcp_responsiveness
 					|| true === $tcp = $this->check_tcp_responsiveness($host, $port, $timeout) )
 				{
-					$this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );	
+					// $this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
+					$this->dbhs[$dbhname] = NEW PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
 
 				$elapsed = $this->timer_stop();
 
-				if ( is_resource( $this->dbhs[$dbhname] ) ) {
+				if ( $this->is_pdo_resource( $this->dbhs[$dbhname] ) ) {
 					/**
 					 * If we care about lag, disconnect lagged slaves and try to find others.
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
 					 */
+
 					if ( !$use_master && !$write && !isset( $ignore_slave_lag )
 						&& isset($this->lag_threshold) && !isset( $server['host'] )
 						&& $lagged_status !== HYPERDB_LAG_OK
@@ -595,7 +593,7 @@ class hyperdb extends wpdb {
 						$msg = "Replication lag of {$this->lag}s on $host:$port ($dbhname)";
 						$this->print_error( $msg );
 						continue;
-					} elseif ( mysql_select_db( $name, $this->dbhs[ $dbhname ] ) ) {
+					} else {
 						$success = true;
 						$this->current_host = "$host:$port";
 						$this->dbh2host[$dbhname] = "$host:$port";
@@ -615,16 +613,16 @@ class hyperdb extends wpdb {
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
 				$msg .= "'server' => {$server},\n";
 				$msg .= "'host' => {$host},\n";
-				$msg .= "'error' => " . mysql_error() . ",\n";
-				$msg .= "'errno' => " . mysql_errno() . ",\n";
+				$msg .= "'error' => " . $this->dbhs[$dbhname]->getErrorMessage() . ",\n";
+				// $msg .= "'errno' => " . mysql_errno() . ",\n";
 				$msg .= "'tcp_responsive' => " . ( $tcp === true ? 'true' : $tcp ) . ",\n";
 				$msg .= "'lagged_status' => " . ( isset( $lagged_status ) ? $lagged_status : HYPERDB_LAG_UNKNOWN );
 
 				$this->print_error( $msg );
 			}
 
-			if ( !$success || !isset($this->dbhs[$dbhname]) || !is_resource( $this->dbhs[$dbhname] ) ) {
-				if ( !isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) { 
+			if ( !$success || !isset($this->dbhs[$dbhname]) || !$this->is_pdo_resource( $this->dbhs[$dbhname] ) ) {
+				if ( !isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
 					// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
 					$ignore_slave_lag = true;
 					$tries_remaining = count( $servers );
@@ -639,6 +637,7 @@ class hyperdb extends wpdb {
 					'dataset' => $dataset,
 					'dbhname' => $dbhname
 				);
+
 				$this->run_callbacks( 'db_connection_error', $error_details );
 
 				return $this->bail( "Unable to connect to $host:$port to $operation table '$this->table' ($dataset)" );
@@ -647,7 +646,7 @@ class hyperdb extends wpdb {
 			break;
 		} while ( true );
 
-		if ( !isset( $charset ) ) 
+		if ( !isset( $charset ) )
 			$charset = null;
 
 		if ( !isset( $collate ) )
@@ -677,21 +676,22 @@ class hyperdb extends wpdb {
 	 * @param string   $collate The collation (optional)
 	 */
 	function set_charset($dbh, $charset = null, $collate = null) {
-		if ( !isset($charset) )
-			$charset = $this->charset;
-		if ( !isset($collate) )
-			$collate = $this->collate;
-		if ( $this->has_cap( 'collation', $dbh ) && !empty( $charset ) ) {
-			if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-				mysql_set_charset( $charset, $dbh );
-				$this->real_escape = true;
-			} else {
-				$query = $this->prepare( 'SET NAMES %s', $charset );
-				if ( ! empty( $collate ) )
-					$query .= $this->prepare( ' COLLATE %s', $collate );
-				mysql_query( $query, $dbh );
-			}
-		}
+		// if ( !isset($charset) )
+		// 	$charset = $this->charset;
+		// if ( !isset($collate) )
+		// 	$collate = $this->collate;
+		// if ( $this->has_cap( 'collation', $dbh ) && !empty( $charset ) ) {
+		// 	if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
+		// 		mysql_set_charset( $charset, $dbh );
+		// 		$this->real_escape = true;
+		// 	} else {
+		// 		$query = $this->prepare( 'SET NAMES %s', $charset );
+		// 		if ( ! empty( $collate ) )
+		// 			$query .= $this->prepare( ' COLLATE %s', $collate );
+		// 		// mysql_query( $query, $dbh );
+		// 		$dbh->query($query);
+		// 	}
+		// }
 	}
 
 	/**
@@ -702,8 +702,9 @@ class hyperdb extends wpdb {
 		if ( $k = array_search($dbhname, $this->open_connections) )
 			unset($this->open_connections[$k]);
 
-		if ( is_resource($this->dbhs[$dbhname]) )
-			mysql_close($this->dbhs[$dbhname]);
+		if ( $this->is_pdo_resource($this->dbhs[$dbhname]) )
+			// mysql_close($this->dbhs[$dbhname]);
+			$this->dbhs[$dbhname] = null;
 
 		unset($this->dbhs[$dbhname]);
 	}
@@ -743,18 +744,20 @@ class hyperdb extends wpdb {
 		} else {
 			$this->dbh = $this->db_connect( $query );
 
-			if ( ! is_resource($this->dbh) )
+			if ( ! $this->is_pdo_resource($this->dbh) )
 				return false;
 
 			$this->timer_start();
-			$this->result = mysql_query($query, $this->dbh);
+			// $this->result = mysql_query($query, $this->dbh);
+			$this->result = $this->dbh->query($query);
 			$elapsed = $this->timer_stop();
 			++$this->num_queries;
 
 			if ( preg_match('/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query) ) {
 				if ( false === strpos($query, "NO_SELECT_FOUND_ROWS") ) {
 					$this->timer_start();
-					$this->last_found_rows_result = mysql_query("SELECT FOUND_ROWS()", $this->dbh);
+					// $this->last_found_rows_result = mysql_query("SELECT FOUND_ROWS()", $this->dbh);
+					$this->last_found_rows_result = $this->dbh->query("SELECT FOUND_ROWS()");
 					$elapsed += $this->timer_stop();
 					++$this->num_queries;
 					$query .= "; SELECT FOUND_ROWS()";
@@ -772,7 +775,7 @@ class hyperdb extends wpdb {
 		}
 
 		// If there is an error then take note of it
-		if ( $this->last_error = mysql_error($this->dbh) ) {
+		if ( $this->last_error = $this->dbh->getErrorMessage() ) {
 			$this->print_error($this->last_error);
 			return false;
 		}
@@ -867,16 +870,17 @@ class hyperdb extends wpdb {
 	 * @return false|string false on failure, version number on success
 	 */
 	function db_version( $dbh_or_table = false ) {
-		if ( !$dbh_or_table && $this->dbh )
-			$dbh =& $this->dbh;
-		elseif ( is_resource( $dbh_or_table ) )
-			$dbh =& $dbh_or_table;
-		else
-			$dbh = $this->db_connect( "SELECT FROM $dbh_or_table $this->users" );
+		// if ( !$dbh_or_table && $this->dbh )
+		// 	$dbh =& $this->dbh;
+		// elseif ( $this->is_pdo_resource( $dbh_or_table ) )
+		// 	$dbh =& $dbh_or_table;
+		// else
+		// 	$dbh = $this->db_connect( "SELECT FROM $dbh_or_table $this->users" );
 
-		if ( $dbh )
-			return preg_replace('/[^0-9.].*/', '', mysql_get_server_info( $dbh ));
-		return false;
+		// if ( $dbh )
+		// 	return preg_replace('/[^0-9.].*/', '', mysql_get_server_info( $dbh ));
+		// return false;
+		return 4.1;
 	}
 
 	/**
@@ -974,8 +978,21 @@ class hyperdb extends wpdb {
 		return HYPERDB_LAG_OK;
 	}
 
+	private function is_pdo_resource($dbh) {
+		return $dbh != false && !$dbh->isError;
+	}
+
+	private function ping($dbh){
+        try {
+            $dbh->query('SELECT 1');
+        } catch (PDOException $e) {
+        	return false;
+        }
+        return true;
+	}
+
 	// Helper functions for configuration
-	
+
 } // class hyperdb
 
 $wpdb = new hyperdb();
