@@ -341,7 +341,7 @@ class hyperdb extends wpdb {
 	 * @return resource mysql database connection
 	 */
 	function &db_connect( $query = '' ) {
-		$connect_function = $this->persistent ? 'mysql_pconnect' : 'mysql_connect';
+		// $connect_function = $this->persistent ? 'mysql_pconnect' : 'mysql_connect';
 		if ( empty( $this->hyper_servers ) ) {
 			if ( $this->is_pdo_resource( $this->dbh ) )
 				return $this->dbh;
@@ -352,7 +352,6 @@ class hyperdb extends wpdb {
 				|| !defined('DB_NAME') )
 				return $this->bail("We were unable to query because there was no database defined.");
 			// $this->dbh = @ $connect_function(DB_HOST, DB_USER, DB_PASSWORD, true);
-
 			$this->dbh = NEW PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
 
 			if ( ! $this->is_pdo_resource( $this->dbh ) )
@@ -563,7 +562,7 @@ class hyperdb extends wpdb {
 					|| true === $tcp = $this->check_tcp_responsiveness($host, $port, $timeout) )
 				{
 					// $this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
-					$this->dbhs[$dbhname] = NEW PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
+					$this->dbhs[$dbhname] = NEW PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port"));
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
@@ -613,7 +612,7 @@ class hyperdb extends wpdb {
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
 				$msg .= "'server' => {$server},\n";
 				$msg .= "'host' => {$host},\n";
-				$msg .= "'error' => " . $this->dbhs[$dbhname]->getErrorMessage() . ",\n";
+				// $msg .= "'error' => " . $this->dbhs[$dbhname]->getErrorMessage() . ",\n";
 				// $msg .= "'errno' => " . mysql_errno() . ",\n";
 				$msg .= "'tcp_responsive' => " . ( $tcp === true ? 'true' : $tcp ) . ",\n";
 				$msg .= "'lagged_status' => " . ( isset( $lagged_status ) ? $lagged_status : HYPERDB_LAG_UNKNOWN );
@@ -738,10 +737,10 @@ class hyperdb extends wpdb {
 		// Keep track of the last query for debug..
 		$this->last_query = $query;
 
-		if ( preg_match('/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query) && is_resource($this->last_found_rows_result) ) {
-			$this->result = $this->last_found_rows_result;
-			$elapsed = 0;
-		} else {
+		// if ( preg_match('/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query) && is_resource($this->last_found_rows_result) ) {
+		// 	$this->result = $this->last_found_rows_result;
+		// 	$elapsed = 0;
+		// } else {
 			$this->dbh = $this->db_connect( $query );
 
 			if ( ! $this->is_pdo_resource($this->dbh) )
@@ -750,21 +749,24 @@ class hyperdb extends wpdb {
 			$this->timer_start();
 			// $this->result = mysql_query($query, $this->dbh);
 			$this->result = $this->dbh->query($query);
+
 			$elapsed = $this->timer_stop();
 			++$this->num_queries;
 
-			if ( preg_match('/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query) ) {
-				if ( false === strpos($query, "NO_SELECT_FOUND_ROWS") ) {
-					$this->timer_start();
-					// $this->last_found_rows_result = mysql_query("SELECT FOUND_ROWS()", $this->dbh);
-					$this->last_found_rows_result = $this->dbh->query("SELECT FOUND_ROWS()");
-					$elapsed += $this->timer_stop();
-					++$this->num_queries;
-					$query .= "; SELECT FOUND_ROWS()";
-				}
-			} else {
-				$this->last_found_rows_result = null;
-			}
+			// if ( preg_match('/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query) ) {
+			// 	if ( false === strpos($query, "NO_SELECT_FOUND_ROWS") ) {
+			// 		$this->timer_start();
+			// 		// $this->last_found_rows_result = mysql_query("SELECT FOUND_ROWS()", $this->dbh);
+			// 		$this->dbh->query("SELECT FOUND_ROWS()");
+			// 		$this->last_found_rows_result = $this->dbh->getReturnValue();
+			// 		error_log(var_export($this->last_found_rows_result, true))
+			// 		$elapsed += $this->timer_stop();
+			// 		++$this->num_queries;
+			// 		$query .= "; SELECT FOUND_ROWS()";
+			// 	}
+			// } else {
+			// 	$this->last_found_rows_result = null;
+			// }
 
 			if ( $this->save_queries ) {
 				if ( is_callable($this->save_query_callback) )
@@ -772,7 +774,7 @@ class hyperdb extends wpdb {
 				else
 					$this->queries[] = array( $query, $elapsed, $this->get_caller() );
 			}
-		}
+		// }
 
 		// If there is an error then take note of it
 		if ( $this->last_error = $this->dbh->getErrorMessage() ) {
@@ -781,35 +783,39 @@ class hyperdb extends wpdb {
 		}
 
 		if ( preg_match("/^\\s*(insert|delete|update|replace|alter) /i",$query) ) {
-			$this->rows_affected = mysql_affected_rows($this->dbh);
+			$this->rows_affected = $this->dbh->getAffectedRows();
 
 			// Take note of the insert_id
 			if ( preg_match("/^\\s*(insert|replace) /i",$query) ) {
-				$this->insert_id = mysql_insert_id($this->dbh);
+				$this->insert_id = $this->dbh->getInsertID();
 			}
 			// Return number of rows affected
 			$return_val = $this->rows_affected;
 		} else {
-			$i = 0;
-			$this->col_info = array();
-			while ($i < @mysql_num_fields($this->result)) {
-				$this->col_info[$i] = @mysql_fetch_field($this->result);
-				$i++;
-			}
-			$num_rows = 0;
-			$this->last_result = array();
-			while ( $row = @mysql_fetch_object($this->result) ) {
-				$this->last_result[$num_rows] = $row;
-				$num_rows++;
-			}
+			// $i = 0;
+			// $this->col_info = array();
+			// while ($i < @mysql_num_fields($this->result)) {
+			// 	$this->col_info[$i] = @mysql_fetch_field($this->result);
+			// 	$i++;
+			// }
+			$this->col_info = $this->dbh->getColumns();
 
-			@mysql_free_result($this->result);
+			// $num_rows = 0;
+			// $this->last_result = array();
+			// while ( $row = @mysql_fetch_object($this->result) ) {
+			// 	$this->last_result[$num_rows] = $row;
+			// 	$num_rows++;
+			// }
+
+			$this->last_result = $this->dbh->getQueryResults();
+
+			// @mysql_free_result($this->result);
 
 			// Log number of rows the query returned
-			$this->num_rows = $num_rows;
+			$this->num_rows = $this->dbh->getNumRows();
 
 			// Return number of rows selected
-			$return_val = $this->num_rows;
+			$return_val = $this->dbh->getReturnValue();
 		}
 
 		return $return_val;
@@ -880,7 +886,7 @@ class hyperdb extends wpdb {
 		// if ( $dbh )
 		// 	return preg_replace('/[^0-9.].*/', '', mysql_get_server_info( $dbh ));
 		// return false;
-		return 4.1;
+		return 5.5;
 	}
 
 	/**
