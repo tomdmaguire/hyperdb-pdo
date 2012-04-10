@@ -50,16 +50,6 @@ class hyperdb extends wpdb {
 	var $last_table;
 
 	/**
-	 * After any SQL_CALC_FOUND_ROWS query, the query "SELECT FOUND_ROWS()"
-	 * is sent and the mysql result resource stored here. The next query
-	 * for FOUND_ROWS() will retrieve this. We do this to prevent any
-	 * intervening queries from making FOUND_ROWS() inaccessible. You may
-	 * prevent this by adding "NO_SELECT_FOUND_ROWS" in a comment.
-	 * @var resource
-	 */
-	var $last_found_rows_result;
-
-	/**
 	 * Whether to store queries in an array. Useful for debugging and profiling.
 	 * @var bool
 	 */
@@ -341,7 +331,6 @@ class hyperdb extends wpdb {
 	 * @return resource mysql database connection
 	 */
 	function &db_connect( $query = '' ) {
-		// $connect_function = $this->persistent ? 'mysql_pconnect' : 'mysql_connect';
 		if ( empty( $this->hyper_servers ) ) {
 			if ( $this->is_pdo_resource( $this->dbh ) )
 				return $this->dbh;
@@ -351,8 +340,7 @@ class hyperdb extends wpdb {
 				|| !defined('DB_PASSWORD')
 				|| !defined('DB_NAME') )
 				return $this->bail("We were unable to query because there was no database defined.");
-			// $this->dbh = @ $connect_function(DB_HOST, DB_USER, DB_PASSWORD, true);
-			$this->dbh = NEW PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
+			$this->dbh = new PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
 
 			if ( ! $this->is_pdo_resource( $this->dbh ) )
 				return $this->bail("We were unable to connect to the database. (DB_HOST)");
@@ -360,7 +348,6 @@ class hyperdb extends wpdb {
 				$collation_query = "SET NAMES '$this->charset'";
 				if ( !empty( $this->collate ) )
 					$collation_query .= " COLLATE '$this->collate'";
-				// mysql_query($collation_query, $this->dbh);
 				$this->dbh->query($query);
 			}
 			return $this->dbh;
@@ -651,8 +638,6 @@ class hyperdb extends wpdb {
 		if ( !isset( $collate ) )
 			$collate = null;
 
-		$this->set_charset($this->dbhs[$dbhname], $charset, $collate);
-
 		$this->dbh = $this->dbhs[$dbhname]; // needed by $wpdb->_real_escape()
 
 		$this->last_used_server = compact('host', 'user', 'name', 'read', 'write');
@@ -669,31 +654,6 @@ class hyperdb extends wpdb {
 	}
 
 	/**
-	 * Sets the connection's character set.
-	 * @param resource $dbh     The resource given by mysql_connect
-	 * @param string   $charset The character set (optional)
-	 * @param string   $collate The collation (optional)
-	 */
-	function set_charset($dbh, $charset = null, $collate = null) {
-		// if ( !isset($charset) )
-		// 	$charset = $this->charset;
-		// if ( !isset($collate) )
-		// 	$collate = $this->collate;
-		// if ( $this->has_cap( 'collation', $dbh ) && !empty( $charset ) ) {
-		// 	if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-		// 		mysql_set_charset( $charset, $dbh );
-		// 		$this->real_escape = true;
-		// 	} else {
-		// 		$query = $this->prepare( 'SET NAMES %s', $charset );
-		// 		if ( ! empty( $collate ) )
-		// 			$query .= $this->prepare( ' COLLATE %s', $collate );
-		// 		// mysql_query( $query, $dbh );
-		// 		$dbh->query($query);
-		// 	}
-		// }
-	}
-
-	/**
 	 * Disconnect and remove connection from open connections list
 	 * @param string $tdbhname
 	 */
@@ -702,7 +662,6 @@ class hyperdb extends wpdb {
 			unset($this->open_connections[$k]);
 
 		if ( $this->is_pdo_resource($this->dbhs[$dbhname]) )
-			// mysql_close($this->dbhs[$dbhname]);
 			$this->dbhs[$dbhname] = null;
 
 		unset($this->dbhs[$dbhname]);
@@ -737,44 +696,23 @@ class hyperdb extends wpdb {
 		// Keep track of the last query for debug..
 		$this->last_query = $query;
 
-		// if ( preg_match('/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query) && is_resource($this->last_found_rows_result) ) {
-		// 	$this->result = $this->last_found_rows_result;
-		// 	$elapsed = 0;
-		// } else {
-			$this->dbh = $this->db_connect( $query );
+		$this->dbh = $this->db_connect( $query );
 
-			if ( ! $this->is_pdo_resource($this->dbh) )
-				return false;
+		if ( ! $this->is_pdo_resource($this->dbh) )
+			return false;
 
-			$this->timer_start();
-			// $this->result = mysql_query($query, $this->dbh);
-			$this->result = $this->dbh->query($query);
+		$this->timer_start();
+		$this->result = $this->dbh->query($query);
 
-			$elapsed = $this->timer_stop();
-			++$this->num_queries;
+		$elapsed = $this->timer_stop();
+		++$this->num_queries;
 
-			// if ( preg_match('/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query) ) {
-			// 	if ( false === strpos($query, "NO_SELECT_FOUND_ROWS") ) {
-			// 		$this->timer_start();
-			// 		// $this->last_found_rows_result = mysql_query("SELECT FOUND_ROWS()", $this->dbh);
-			// 		$this->dbh->query("SELECT FOUND_ROWS()");
-			// 		$this->last_found_rows_result = $this->dbh->getReturnValue();
-			// 		error_log(var_export($this->last_found_rows_result, true))
-			// 		$elapsed += $this->timer_stop();
-			// 		++$this->num_queries;
-			// 		$query .= "; SELECT FOUND_ROWS()";
-			// 	}
-			// } else {
-			// 	$this->last_found_rows_result = null;
-			// }
-
-			if ( $this->save_queries ) {
-				if ( is_callable($this->save_query_callback) )
-					$this->queries[] = call_user_func_array( $this->save_query_callback, array( $query, $elapsed, $this->save_backtrace ? debug_backtrace( false ) : null, &$this ) );
-				else
-					$this->queries[] = array( $query, $elapsed, $this->get_caller() );
-			}
-		// }
+		if ( $this->save_queries ) {
+			if ( is_callable($this->save_query_callback) )
+				$this->queries[] = call_user_func_array( $this->save_query_callback, array( $query, $elapsed, $this->save_backtrace ? debug_backtrace( false ) : null, &$this ) );
+			else
+				$this->queries[] = array( $query, $elapsed, $this->get_caller() );
+		}
 
 		// If there is an error then take note of it
 		if ( $this->last_error = $this->dbh->getErrorMessage() ) {
@@ -792,24 +730,9 @@ class hyperdb extends wpdb {
 			// Return number of rows affected
 			$return_val = $this->rows_affected;
 		} else {
-			// $i = 0;
-			// $this->col_info = array();
-			// while ($i < @mysql_num_fields($this->result)) {
-			// 	$this->col_info[$i] = @mysql_fetch_field($this->result);
-			// 	$i++;
-			// }
 			$this->col_info = $this->dbh->getColumns();
 
-			// $num_rows = 0;
-			// $this->last_result = array();
-			// while ( $row = @mysql_fetch_object($this->result) ) {
-			// 	$this->last_result[$num_rows] = $row;
-			// 	$num_rows++;
-			// }
-
 			$this->last_result = $this->dbh->getQueryResults();
-
-			// @mysql_free_result($this->result);
 
 			// Log number of rows the query returned
 			$this->num_rows = $this->dbh->getNumRows();

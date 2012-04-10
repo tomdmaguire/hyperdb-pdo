@@ -64,59 +64,59 @@ class PDO_Engine{
         global $wpdb;
         list ($this->dbType, $dbUser, $dbPassword, $dbName, $dbHost) = $connectionParams;
         switch ($this->dbType){
-            // case 'sqlite':
-            //     //as sqlite is file system database, we need to make sure that permissions
-            //     //don't bite us in the arse
-            //     $u = umask(0000);
-            //     //  determines whether we are in the installation process.  If so, we
-            //     //  create the holding directory, protect it from direct access and create the database
-            //     if (!is_dir(FQDBDIR)){
+            case 'sqlite':
+                //as sqlite is file system database, we need to make sure that permissions
+                //don't bite us in the arse
+                $u = umask(0000);
+                //  determines whether we are in the installation process.  If so, we
+                //  create the holding directory, protect it from direct access and create the database
+                if (!is_dir(FQDBDIR)){
 
-            //         if (!@mkdir(FQDBDIR, 0777, true)){
-            //             umask($u);
-            //             $wpdb->bail("<h1>Cannot create folder</h1><p>The installation routine cannot create the folder in which the sqlite database will be stored.  This will usually be because of permissions errors.</p>");
-            //         }
-            //     }
-            //     if (!is_writable (FQDBDIR)){
-            //         umask($u);
-            //         $wpdb->bail('<h1>Permissions Problem</h1><p>PDO For WordPress needs to be able to write to the folder ' .FQDBDIR ."</p>");
-            //     }
+                    if (!@mkdir(FQDBDIR, 0777, true)){
+                        umask($u);
+                        $wpdb->bail("<h1>Cannot create folder</h1><p>The installation routine cannot create the folder in which the sqlite database will be stored.  This will usually be because of permissions errors.</p>");
+                    }
+                }
+                if (!is_writable (FQDBDIR)){
+                    umask($u);
+                    $wpdb->bail('<h1>Permissions Problem</h1><p>PDO For WordPress needs to be able to write to the folder ' .FQDBDIR ."</p>");
+                }
 
-            //     if (!is_file(FQDBDIR.'/.htaccess')){
-            //         $fh = fopen(FQDBDIR.'/.htaccess', "w");
-            //         if (!$fh) {
-            //             umask($u);
-            //             $wpdb->bail("<h1>Cannot create htaccess file</h1><p>The installation routine cannot create the htaccess file needed to protect your database</p>");
-            //         }
-            //         fwrite ($fh, "DENY FROM ALL");
-            //         fclose ($fh);
-            //     }
-            //     //reset the umask to what it was.
-            //     umask($u);
+                if (!is_file(FQDBDIR.'/.htaccess')){
+                    $fh = fopen(FQDBDIR.'/.htaccess', "w");
+                    if (!$fh) {
+                        umask($u);
+                        $wpdb->bail("<h1>Cannot create htaccess file</h1><p>The installation routine cannot create the htaccess file needed to protect your database</p>");
+                    }
+                    fwrite ($fh, "DENY FROM ALL");
+                    fclose ($fh);
+                }
+                //reset the umask to what it was.
+                umask($u);
 
-            //     $dsn = "sqlite:".FQDB;
-            //     if (is_file(FQDB)){
-            //         $this->pdo = new PDO($dsn);
-            //         $s = $this->pdo->query('select count(*) from SQLite_Master where type="table"');
-            //         $count = $s->fetchColumn(0);
-            //         $s = null; //release the recordset
-            //         if ($count < 2){
-            //             //echo 'installing database';
-            //             $this->installDB();
-            //         }
-            //         //install the UDFs
-            //         require_once PDODIR . '/driver_sqlite/pdo_sqlite_udfs.php';
-            //         new PDO_SQLITE_UDFS($this->pdo);
+                $dsn = "sqlite:".FQDB;
+                if (is_file(FQDB)){
+                    $this->pdo = new PDO($dsn);
+                    $s = $this->pdo->query('select count(*) from SQLite_Master where type="table"');
+                    $count = $s->fetchColumn(0);
+                    $s = null; //release the recordset
+                    if ($count < 2){
+                        //echo 'installing database';
+                        $this->installDB();
+                    }
+                    //install the UDFs
+                    require_once PDODIR . '/driver_sqlite/pdo_sqlite_udfs.php';
+                    new PDO_SQLITE_UDFS($this->pdo);
 
-            //     } else {
-            //         $this->pdo = new PDO($dsn);
-            //         //if the database did not exist, we need to step in
-            //         //quickly and create the tables to stop wordpress from trying to do it
-            //         $this->installDB();
-            //     }
+                } else {
+                    $this->pdo = new PDO($dsn);
+                    //if the database did not exist, we need to step in
+                    //quickly and create the tables to stop wordpress from trying to do it
+                    $this->installDB();
+                }
 
 
-            // break;
+            break;
             case 'mysql':
                 $dsn = "mysql:dbname={$dbName};host={$dbHost}";
                 $this->pdo = new PDO ($dsn, $dbUser, $dbPassword);
@@ -147,12 +147,12 @@ HTML;
      *  note that we cannot use neat ->bail() error function as at this point $wpdb is not fully instantiated.
      */
     private function installDB(){
-        // switch ($this->dbType){
-        //     case "sqlite":
-        //         require_once PDODIR.'/wp_install.php';
-        //         break;
+        switch ($this->dbType){
+            case "sqlite":
+                require_once PDODIR.'/wp_install.php';
+                break;
 
-        // }
+        }
     }
 
 
@@ -186,48 +186,48 @@ HTML;
             break;
             case 'multiinsert':
                 switch ($this->dbType){
-                    // case "sqlite":
-                    //     list($insertSQLPrefix, $values, $count) = $this->multiInsertMatches;
-                    //     $this->multiInsertMatches = array();
+                    case "sqlite":
+                        list($insertSQLPrefix, $values, $count) = $this->multiInsertMatches;
+                        $this->multiInsertMatches = array();
 
-                    //     if ($count > 1){
-                    //         $cnt = 1;
-                    //         $first = true;
-                    //         $this->reriteEngine = new pdo_sqlite_driver();
-                    //         foreach ($values as $value){
-                    //             if (substr($value, -1, 1) === ')'){
-                    //                 $suffix = '';
-                    //             } else {
-                    //                 $suffix = ')';
-                    //             }
-                    //             $query = $insertSQLPrefix .' ' . $value . $suffix;
-                    //             $this->rewrittenQuery = $this->rewriteEngine->rewriteQuery($query, 'insert');
-                    //             //logically they should all be the same shape so we can prepare the first one.
-                    //             //and execute against subsequents
-                    //             $this->queries[] = $this->rewrittenQuery;
-                    //             //get variables
-                    //             $this->extractedVariables = array();
-                    //             $this->extractVariables();
-                    //             if ($first){
-                    //                 $this->prepareQuery();
-                    //                 $first = false;
-                    //                 /*if ($this->isError){
-                    //                     global $wpdb;
-                    //                     $wpdb->bail($this->getErrorMessage());
-                    //                 }
-                    //                 */
-                    //             }   else {
-                    //                 $this->executeQuery($this->statement);
-                    //                 /*
-                    //                 if ($this->isError){
-                    //                     global $wpdb;
-                    //                     $wpdb->bail($this->getErrorMessage());
-                    //                 }
-                    //                 */
-                    //             }
-                    //         }
-                    //     }
-                    // break;
+                        if ($count > 1){
+                            $cnt = 1;
+                            $first = true;
+                            $this->reriteEngine = new pdo_sqlite_driver();
+                            foreach ($values as $value){
+                                if (substr($value, -1, 1) === ')'){
+                                    $suffix = '';
+                                } else {
+                                    $suffix = ')';
+                                }
+                                $query = $insertSQLPrefix .' ' . $value . $suffix;
+                                $this->rewrittenQuery = $this->rewriteEngine->rewriteQuery($query, 'insert');
+                                //logically they should all be the same shape so we can prepare the first one.
+                                //and execute against subsequents
+                                $this->queries[] = $this->rewrittenQuery;
+                                //get variables
+                                $this->extractedVariables = array();
+                                $this->extractVariables();
+                                if ($first){
+                                    $this->prepareQuery();
+                                    $first = false;
+                                    /*if ($this->isError){
+                                        global $wpdb;
+                                        $wpdb->bail($this->getErrorMessage());
+                                    }
+                                    */
+                                }   else {
+                                    $this->executeQuery($this->statement);
+                                    /*
+                                    if ($this->isError){
+                                        global $wpdb;
+                                        $wpdb->bail($this->getErrorMessage());
+                                    }
+                                    */
+                                }
+                            }
+                        }
+                    break;
 
                     case "mysql":
                         $this->rewrittenQuery = $this->initialQuery;
@@ -239,13 +239,13 @@ HTML;
 
             default:
                 switch ($this->dbType){
-                    // case "sqlite":
-                    //     require_once PDODIR."/driver_sqlite/pdo_sqlite_driver.php";
+                    case "sqlite":
+                        require_once PDODIR."/driver_sqlite/pdo_sqlite_driver.php";
 
-                    //     $this->rewriteEngine = new pdo_sqlite_driver();
-                    //     $this->rewrittenQuery = $this->rewriteEngine->rewriteQuery($this->initialQuery, $this->queryType);
-                    //     $this->needsPostProcessing = true;
-                    // break;
+                        $this->rewriteEngine = new pdo_sqlite_driver();
+                        $this->rewrittenQuery = $this->rewriteEngine->rewriteQuery($this->initialQuery, $this->queryType);
+                        $this->needsPostProcessing = true;
+                    break;
                     case "mysql":
                         //no rewrite engine needed
                         $this->rewrittenQuery = $this->initialQuery;
@@ -633,8 +633,7 @@ HTML;
         $this->errors[] = array("line"=>$line, "function"=>$function);
         $this->errorMessages[] = $message;
         $this->isError = true;
-        // file_put_contents (FQDBDIR .'/debug.txt', "Line $line, Function: $function, Message: $message \n", FILE_APPEND);
-        error_log("Line $line, Function: $function, Message: $message \n");
+        file_put_contents (FQDBDIR .'/debug.txt', "Line $line, Function: $function, Message: $message \n", FILE_APPEND);
     }
 
     /**
