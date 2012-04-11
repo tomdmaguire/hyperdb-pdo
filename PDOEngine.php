@@ -117,8 +117,15 @@ class PDO_Engine{
 
 
             break;
+
             case 'mysql':
-                $dsn = "mysql:dbname={$dbName};host={$dbHost}";
+                if(strstr($dbHost, ':')) {
+                    $bits = explode(':', $dbHost);
+                    $dsn = "mysql:dbname={$dbName};host=" . $bits[0] . ';port=' . $bits[1];
+                } else {
+                    $dsn = "mysql:dbname={$dbName};host={$dbHost}";
+                }
+
                 $this->pdo = new PDO ($dsn, $dbUser, $dbPassword);
             break;
             default:
