@@ -457,7 +457,7 @@ HTML;
         global $wpdb;
         if (!is_object($statement)) return;
         if (count($this->extractedVariables) > 0){
-            $this->queries[] = "Executing:\t ".print_r($this->extractedVariables, true);
+            $this->queries[] = "Executing:\t ".serialize($this->extractedVariables);
             do {
                 $result = $statement->execute($this->extractedVariables);
                 if (!$result){
