@@ -431,17 +431,6 @@ class hyperdb extends wpdb {
 			$this->last_used_server = $this->used_servers[$dbhname];
 			$this->last_connection = compact('dbhname', 'name');
 
-			// if ( !mysql_ping($this->dbhs[$dbhname]) ) {
-			if( !$this->ping($this->dbhs[$dbhname])) {
-				if ( isset( $conn['disconnect (ping failed)'] ) )
-					++$conn['disconnect (ping failed)'];
-				else
-					$conn['disconnect (ping failed)'] = 1;
-
-				$this->disconnect($dbhname);
-				break;
-			}
-
 			if ( isset( $conn['queries'] ) )
 				++$conn['queries'];
 			else
@@ -549,7 +538,6 @@ class hyperdb extends wpdb {
 				if ( $use_master || !$tries_remaining || !$this->check_tcp_responsiveness
 					|| true === $tcp = $this->check_tcp_responsiveness($host, $port, $timeout) )
 				{
-					// $this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
 					$this->dbhs[$dbhname] = new PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port"));
 				} else {
 					$this->dbhs[$dbhname] = false;
@@ -915,15 +903,6 @@ class hyperdb extends wpdb {
 
 	private function is_pdo_resource($dbh) {
 		return $dbh != false && !$dbh->isError;
-	}
-
-	private function ping($dbh){
-        try {
-            $dbh->query('SELECT 1');
-        } catch (PDOException $e) {
-        	return false;
-        }
-        return true;
 	}
 
 	// Helper functions for configuration
