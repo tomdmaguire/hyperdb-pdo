@@ -243,6 +243,26 @@ HTML;
                     case "mysql":
                         $this->rewrittenQuery = $this->initialQuery;
                         $this->needsPostProcessing = false;
+
+                        $this->queries[]="Rewritten: $this->rewrittenQuery";
+                        // prepare the query to use placeholders (avoids sql injection attacks)
+                        $this->extractVariables();
+
+                        //prepare the query
+                        //and execute it (called from prepare())
+                        $this->prepareQuery();
+                        if (!$this->isError){
+                            //postprocess, for IF statements.
+                            $this->processResults();
+                            //$wpdb expects an array of objects as a result whereas ironically we are using arrays
+                            $this->convertToObject();
+                        } else {
+                            /*
+                             *
+                             global $wpdb;
+                            $wpdb->bail($this->getErrorMessage());
+                            */
+                        }
                     break;
 
                 }
