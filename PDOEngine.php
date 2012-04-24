@@ -189,12 +189,6 @@ HTML;
         $this->initialQuery = $query;
         $this->determineQueryType($query);
         switch (strtolower($this->queryType)){
-            case 'foundrows':
-                //for a found rows query we really don't need to do anything other than point the query back at
-                //the results stored in this object by the last query.
-                $this->results = $this->foundRowsResult;
-                $this->foundRowsResult = null;
-            break;
             case 'multiinsert':
                 switch ($this->dbType){
                     case "sqlite":
