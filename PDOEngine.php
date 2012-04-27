@@ -62,7 +62,7 @@ class PDO_Engine{
     private function connect($connectionParams){
         set_time_limit(30);
         global $wpdb;
-        list ($this->dbType, $dbUser, $dbPassword, $dbName, $dbHost) = $connectionParams;
+        list ($this->dbType, $dbUser, $dbPassword, $dbName, $dbHost, $dbCharset) = $connectionParams;
         switch ($this->dbType){
             case 'sqlite':
                 //as sqlite is file system database, we need to make sure that permissions
@@ -125,6 +125,9 @@ class PDO_Engine{
                 } else {
                     $dsn = "mysql:dbname={$dbName};host={$dbHost}";
                 }
+
+                if(!is_null($dbCharset))
+                    $dsn = "{$dsn};charset={$dbCharset}"
 
                 $this->pdo = new PDO ($dsn, $dbUser, $dbPassword);
             break;

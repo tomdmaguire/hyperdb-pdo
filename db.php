@@ -341,7 +341,7 @@ class hyperdb extends wpdb {
 				|| !defined('DB_PASSWORD')
 				|| !defined('DB_NAME') )
 				return $this->bail("We were unable to query because there was no database defined.");
-			$this->dbh = new PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST));
+			$this->dbh = new PDO_Engine(array(DB_TYPE, DB_USER, DB_PASSWORD, DB_NAME, DB_HOST, DB_CHARSET));
 
 			if ( ! $this->is_pdo_resource( $this->dbh ) )
 				return $this->bail("We were unable to connect to the database. (DB_HOST)");
@@ -538,7 +538,7 @@ class hyperdb extends wpdb {
 				if ( $use_master || !$tries_remaining || !$this->check_tcp_responsiveness
 					|| true === $tcp = $this->check_tcp_responsiveness($host, $port, $timeout) )
 				{
-					$this->dbhs[$dbhname] = new PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port"));
+					$this->dbhs[$dbhname] = new PDO_Engine(array(DB_TYPE, $user, $password, $name, "$host:$port", DB_CHARSET));
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
