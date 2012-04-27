@@ -127,7 +127,7 @@ class PDO_Engine{
                 }
 
                 if(!is_null($dbCharset))
-                    $dsn = "{$dsn};charset={$dbCharset}"
+                    $dsn = "{$dsn};charset={$dbCharset}";
 
                 $this->pdo = new PDO ($dsn, $dbUser, $dbPassword);
             break;
