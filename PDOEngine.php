@@ -126,10 +126,15 @@ class PDO_Engine{
                     $dsn = "mysql:dbname={$dbName};host={$dbHost}";
                 }
 
-                if(!is_null($dbCharset))
-                    $dsn = "{$dsn};charset={$dbCharset}";
+                $params = array();
 
-                $this->pdo = new PDO ($dsn, $dbUser, $dbPassword);
+                if($dbCharset == 'utf8')
+                {
+                    $dsn = "{$dsn};charset={$dbCharset}";
+                    $params = array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8");
+                }
+
+                $this->pdo = new PDO ($dsn, $dbUser, $dbPassword, $params);
             break;
             default:
                 $message = <<<HTML
